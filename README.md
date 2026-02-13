@@ -68,6 +68,7 @@ The API will be available at `http://127.0.0.1:8000`.
 ```bash
 curl -X POST http://127.0.0.1:8000/chat \
   -H "Content-Type: application/json" \
+  -H "X-Session-ID: demo-session-123" \
   -d '{"message": "Say hello and explain what tracing is."}'
 ```
 

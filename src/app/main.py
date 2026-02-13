@@ -8,8 +8,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from app.config import get_settings
-from app.services.llm_service import LLMServiceError, get_llm_response
+from .config import get_settings
+from .services.llm_service import LLMServiceError, get_llm_response
 from langfuse import get_client
 
 
@@ -60,15 +60,18 @@ async def chat_endpoint(payload: ChatRequest, request: Request) -> ChatResponse:
     """
     Simple chat endpoint that delegates to the LLM service.
 
-    The FastAPI request ID is propagated into the Langfuse trace via the service layer.
+    The FastAPI request ID and session ID are propagated into the Langfuse trace
+    via the service layer.
     """
     request_id: str = getattr(request.state, "request_id", str(uuid4()))
+    session_id: Optional[str] = request.headers.get("X-Session-ID")
 
     # Run blocking LLM call in a threadpool so we don't block the event loop.
     llm_response: str = await run_in_threadpool(
         get_llm_response,
         payload.message,
         request_id,
+        session_id,
     )
 
     return ChatResponse(response=llm_response, request_id=request_id)

@@ -1,9 +1,9 @@
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from openai import OpenAI
 from langfuse import observe, propagate_attributes
 
-from app.config import get_settings
+from ..config import get_settings
 
 
 class LLMServiceError(Exception):
@@ -19,7 +19,11 @@ def _get_client() -> OpenAI:
 
 
 @observe(name="llm-chat-completion", as_type="generation")
-def get_llm_response(prompt: str, request_id: Optional[str] = None) -> str:
+def get_llm_response(
+    prompt: str,
+    request_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+) -> str:
     """
     Call the LLM via OpenRouter and return the assistant's response content.
 
@@ -68,9 +72,17 @@ def get_llm_response(prompt: str, request_id: Optional[str] = None) -> str:
 
         raise LLMServiceError("Empty response from LLM")
 
+    attributes: Dict[str, Any] = {}
+
+    if session_id:
+        attributes["session_id"] = session_id
+
     if request_id:
-        # Attach FastAPI request ID to the current Langfuse trace metadata
-        with propagate_attributes(metadata={"request_id": request_id}):
+        attributes["metadata"] = {"request_id": request_id}
+
+    if attributes:
+        # Attach FastAPI request/session identifiers to the current Langfuse trace
+        with propagate_attributes(**attributes):
             return _call_llm()
 
     return _call_llm()
