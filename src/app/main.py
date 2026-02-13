@@ -48,6 +48,8 @@ async def add_request_id_middleware(request: Request, call_next):
 
 class ChatRequest(BaseModel):
     message: str
+    model: Optional[str] = None
+    session_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -64,7 +66,7 @@ async def chat_endpoint(payload: ChatRequest, request: Request) -> ChatResponse:
     via the service layer.
     """
     request_id: str = getattr(request.state, "request_id", str(uuid4()))
-    session_id: Optional[str] = request.headers.get("X-Session-ID")
+    session_id: Optional[str] = payload.session_id or request.headers.get("X-Session-ID")
 
     # Run blocking LLM call in a threadpool so we don't block the event loop.
     llm_response: str = await run_in_threadpool(
@@ -72,6 +74,7 @@ async def chat_endpoint(payload: ChatRequest, request: Request) -> ChatResponse:
         payload.message,
         request_id,
         session_id,
+        payload.model,
     )
 
     return ChatResponse(response=llm_response, request_id=request_id)

@@ -18,11 +18,12 @@ def _get_client() -> OpenAI:
     )
 
 
-@observe(name="llm-chat-completion", as_type="generation")
+@observe(name="llm-tracing-demo", as_type="generation")
 def get_llm_response(
     prompt: str,
     request_id: Optional[str] = None,
     session_id: Optional[str] = None,
+    model: Optional[str] = None,
 ) -> str:
     """
     Call the LLM via OpenRouter and return the assistant's response content.
@@ -35,7 +36,7 @@ def get_llm_response(
     def _call_llm() -> str:
         try:
             completion = client.chat.completions.create(
-                model="anthropic/claude-3.5-sonnet",
+                model=model or "anthropic/claude-3.5-sonnet",
                 messages=[
                     {
                         "role": "system",

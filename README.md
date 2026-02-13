@@ -72,6 +72,14 @@ curl -X POST http://127.0.0.1:8000/chat \
   -d '{"message": "Say hello and explain what tracing is."}'
 ```
 
+You can optionally pass `model` and `session_id` in the body. The `session_id` can also be sent via the `X-Session-ID` header.
+
+```bash
+curl -X POST http://127.0.0.1:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello!", "model": "openai/gpt-4o", "session_id": "demo-session-123"}'
+```
+
 Example JSON response:
 
 ```json
