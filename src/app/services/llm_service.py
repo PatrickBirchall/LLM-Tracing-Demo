@@ -18,20 +18,36 @@ def _get_client() -> OpenAI:
     )
 
 
+def _build_user_content(prompt: str, document_context: Optional[str] = None) -> str:
+    """Build the user message, optionally including document context for Q&A."""
+    if document_context and document_context.strip():
+        return (
+            "Use the following document content to answer the question.\n\n"
+            "--- Document ---\n"
+            f"{document_context.strip()}\n"
+            "--- End document ---\n\n"
+            f"Question: {prompt}"
+        )
+    return prompt
+
+
 @observe(name="llm-tracing-demo", as_type="generation")
 def get_llm_response(
     prompt: str,
     request_id: Optional[str] = None,
     session_id: Optional[str] = None,
     model: Optional[str] = None,
+    document_context: Optional[str] = None,
 ) -> str:
     """
     Call the LLM via OpenRouter and return the assistant's response content.
 
     This function is traced by Langfuse via the @observe decorator.
     When a FastAPI request ID is provided, it is attached as metadata on the trace.
+    If document_context is provided, it is included so the model can answer questions about it.
     """
     client = _get_client()
+    user_content = _build_user_content(prompt, document_context)
 
     def _call_llm() -> str:
         try:
@@ -40,11 +56,11 @@ def get_llm_response(
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a helpful assistant for a tracing demo.",
+                        "content": "You are a helpful assistant for a tracing demo. When given document content, answer questions about it accurately and concisely.",
                     },
                     {
                         "role": "user",
-                        "content": prompt,
+                        "content": user_content,
                     },
                 ],
             )

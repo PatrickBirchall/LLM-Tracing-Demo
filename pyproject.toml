@@ -12,4 +12,5 @@ dependencies = [
     "python-dotenv",
     "pydantic",
     "pydantic-settings",
+    "pypdf",
 ]

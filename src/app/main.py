@@ -1,8 +1,8 @@
-from typing import Optional
-
 from uuid import uuid4
 
-from fastapi import FastAPI, Request
+from typing import Optional, Union
+
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -10,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 
 from .config import get_settings
 from .services.llm_service import LLMServiceError, get_llm_response
+from .services.pdf_service import PDFServiceError, extract_text_from_pdf
 from langfuse import get_client
 
 
@@ -80,6 +81,55 @@ async def chat_endpoint(payload: ChatRequest, request: Request) -> ChatResponse:
     return ChatResponse(response=llm_response, request_id=request_id)
 
 
+@app.post("/chat-with-document", response_model=ChatResponse)
+async def chat_with_document_endpoint(
+    request: Request,
+    message: str = Form(..., description="Your question about the document"),
+    file: UploadFile = File(..., description="PDF file to ask questions about"),
+    model: Optional[str] = Form(None),
+    session_id: Optional[str] = Form(None),
+) -> Union[ChatResponse, JSONResponse]:
+    """
+    Submit a PDF and a question; the model will answer based on the document content.
+
+    The PDF is parsed to plain text and sent to the LLM along with your question.
+    """
+    request_id: str = getattr(request.state, "request_id", str(uuid4()))
+    session_id = session_id or request.headers.get("X-Session-ID")
+
+    if file.content_type and "pdf" not in file.content_type.lower():
+        return JSONResponse(
+            status_code=400,
+            content={
+                "detail": "Only PDF files are supported.",
+                "request_id": request_id,
+            },
+        )
+
+    pdf_bytes = await file.read()
+    try:
+        document_text = extract_text_from_pdf(pdf_bytes)
+    except PDFServiceError as e:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "detail": str(e),
+                "request_id": request_id,
+            },
+        )
+
+    llm_response: str = await run_in_threadpool(
+        get_llm_response,
+        message,
+        request_id,
+        session_id,
+        model,
+        document_context=document_text,
+    )
+
+    return ChatResponse(response=llm_response, request_id=request_id)
+
+
 def _record_error_span(
     request: Request,
     error: Exception,
@@ -112,6 +162,22 @@ def _record_error_span(
     ):
         # Nothing else to do in the span body; span context captures the error.
         ...
+
+
+@app.exception_handler(PDFServiceError)
+async def pdf_service_exception_handler(
+    request: Request,
+    exc: PDFServiceError,
+) -> JSONResponse:
+    """Return 400 for invalid or unreadable PDFs."""
+    request_id = getattr(request.state, "request_id", None)
+    return JSONResponse(
+        status_code=400,
+        content={
+            "detail": str(exc),
+            "request_id": request_id,
+        },
+    )
 
 
 @app.exception_handler(LLMServiceError)

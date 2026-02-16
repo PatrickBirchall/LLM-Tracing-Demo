@@ -6,7 +6,10 @@ This project is a minimal FastAPI application that demonstrates LLM tracing usin
 - OpenRouter as the LLM gateway (via the `openai` Python SDK)
 - Langfuse for tracing using the `@observe()` decorator
 
-The main endpoint is a `POST /chat` route that calls an LLM and links each FastAPI request to a Langfuse trace.
+The main endpoints are:
+
+- `POST /chat` – send a message and get an LLM response; each request is linked to a Langfuse trace.
+- `POST /chat-with-document` – send a PDF file and a question; the model answers based on the document content.
 
 ---
 
@@ -90,3 +93,24 @@ Example JSON response:
 ```
 
 You can use the `request_id` to correlate API calls with traces in Langfuse, where it is attached as metadata on the traced LLM call.
+
+---
+
+### Document Q&A: PDF upload
+
+To ask questions about a PDF, use `POST /chat-with-document` with multipart form data:
+
+- `message` (required) – your question about the document
+- `file` (required) – the PDF file
+- `model` (optional) – same as `/chat`
+- `session_id` (optional) – same as `/chat`
+
+Example:
+
+```bash
+curl -X POST http://127.0.0.1:8000/chat-with-document \
+  -F "message=What is the main topic of this document?" \
+  -F "file=@/path/to/document.pdf"
+```
+
+The PDF is converted to plain text and sent to the LLM along with your question. Only PDF files are accepted; invalid or empty PDFs return a 400 error with a descriptive message.
